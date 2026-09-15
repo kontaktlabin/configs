@@ -4,33 +4,14 @@
 # Configuration
 ###############################################################################
 
-WORKTREE="${WORKTREE:-master}"
-SRC_DIR="${SRC_DIR:-$HOME/ws/i/emacs/worktrees/$WORKTREE}"
-BUILD_DIR="${BUILD_DIR:-$HOME/ws/i/emacs/builds/$WORKTREE}"
+SRC_DIR="$HOME/ws/i/emacs/worktrees/master"
+INSTALL_PREFIX="$HOME/.local"
+APPS_DIR="$INSTALL_PREFIX/share/applications"
 
-# Keep the actual installed application in a stable prefix, like Emacs+.
-INSTALL_PREFIX="${INSTALL_PREFIX:-$HOME/.local}"
-
-# Native compilation mode passed to --with-native-compilation.
-#   aot      - compile all of Emacs' Lisp at build time (default, slowest,
-#              most exposed to libgccjit/GCC crashes during the build)
-#   deferred - compile lazily the first time each file loads at runtime
-#   no       - disable native compilation entirely
-NATIVE_COMP="${NATIVE_COMP:-aot}"
-
-# Remotes used to keep the worktree in sync before building.
-#   origin          - your own bare mirror; receives the updated branch
-#   upstream        - canonical upstream (e.g. git.savannah.gnu.org)
-#   upstream-mirror - fallback used only if upstream is unreachable
-REMOTE_ORIGIN="${REMOTE_ORIGIN:-origin}"
-REMOTE_UPSTREAM="${REMOTE_UPSTREAM:-upstream}"
-REMOTE_UPSTREAM_MIRROR="${REMOTE_UPSTREAM_MIRROR:-upstream-mirror}"
 
 CLEAN_BUILD=false
 UNINSTALL=false
 STATUS=false
-
-WORKTREE_OPTION_SET=false
 
 ###############################################################################
 # Helpers
@@ -60,7 +41,6 @@ cleanup_on_error() {
     if ((exit_code != 0)); then
         printf '\n❌ Build failed with exit code %d.\n' "$exit_code" >&2
         printf '   Source: %s\n' "$SRC_DIR" >&2
-        printf '   Build:  %s\n' "$BUILD_DIR" >&2
     fi
 }
 
@@ -70,49 +50,20 @@ usage() {
     cat <<EOF
 Usage: $0 [OPTIONS]
 
-Build and install Emacs from:
+Build and install Emacs (master) from:
   $SRC_DIR
 
 Options:
-  --stable           Use the stable worktree
-  --master           Use the master worktree (default)
-  --worktree NAME    Use a custom worktree
-  -c, --clean        Remove the existing build directory before configuring
+  -c, --clean        Run 'make distclean' before configuring
   -u, --uninstall    Remove the installed Emacs integration
   -s, --status       Show Emacs installation/service status
   -h, --help         Show this help
 
 Environment:
-  WORKTREE           Worktree name
   SRC_DIR            Override source directory
-  BUILD_DIR          Override build directory
   INSTALL_PREFIX     Installation prefix (default: ~/.local)
-  NATIVE_COMP        aot (default), deferred, or no
-  REMOTE_ORIGIN      Your bare mirror remote name (default: origin)
-  REMOTE_UPSTREAM    Canonical upstream remote name (default: upstream)
-  REMOTE_UPSTREAM_MIRROR
-                     Fallback remote if upstream is unreachable
-                     (default: upstream-mirror)
-
-Examples:
-  $0
-  $0 --stable
-  $0 --worktree emacs-32
-  $0 --clean
-  $0 --status
-  $0 --uninstall
 EOF
 }
-
-###############################################################################
-# Package lists
-###############################################################################
-
-# These are intentionally close to the dependencies used by Emacs+.
-#
-# Homebrew's superenv normally handles much of this automatically. Since this
-# script builds outside Homebrew, we explicitly install the tools required by
-# the Emacs build.
 
 brew_build_dependencies=(
     make
@@ -164,37 +115,9 @@ arch_build_dependencies=(
 
 while (($# > 0)); do
     case "$1" in
-        --stable)
-            [[ "$WORKTREE_OPTION_SET" == false ]] ||
-                error "--stable, --master, and --worktree cannot be used together"
-
-            WORKTREE_OPTION_SET=true
-            WORKTREE="stable"
-            SRC_DIR="$HOME/ws/i/emacs/worktrees/stable"
-            BUILD_DIR="$HOME/ws/i/emacs/builds/stable"
-            ;;
-
-        --master)
-            [[ "$WORKTREE_OPTION_SET" == false ]] ||
-                error "--stable, --master, and --worktree cannot be used together"
-
-            WORKTREE_OPTION_SET=true
-            WORKTREE="master"
-            SRC_DIR="$HOME/ws/i/emacs/worktrees/master"
-            BUILD_DIR="$HOME/ws/i/emacs/builds/master"
-            ;;
-
-        --worktree)
-            [[ "$WORKTREE_OPTION_SET" == false ]] ||
-                error "--stable, --master, and --worktree cannot be used together"
-
-            shift
-            (($# > 0)) || error "--worktree requires a name"
-
-            WORKTREE_OPTION_SET=true
-            WORKTREE="$1"
-            SRC_DIR="$HOME/ws/i/emacs/worktrees/$WORKTREE"
-            BUILD_DIR="$HOME/ws/i/emacs/builds/$WORKTREE"
+        -h|--help)
+            usage
+            exit 0
             ;;
 
         -c|--clean)
@@ -207,11 +130,6 @@ while (($# > 0)); do
 
         -s|--status)
             STATUS=true
-            ;;
-
-        -h|--help)
-            usage
-            exit 0
             ;;
 
         *)
@@ -260,22 +178,17 @@ validate_source_tree() {
         error "$SRC_DIR does not appear to be an Emacs source tree"
 }
 
-prepare_build_directory() {
-    if [[ "$CLEAN_BUILD" == true ]]; then
-        if [[ -f "$BUILD_DIR/Makefile" ]]; then
-            log "Running distclean"
-            if [[ "$PLATFORM" == "macOS" ]]; then
-                gmake -C "$BUILD_DIR" distclean || true
-            else
-                make -C "$BUILD_DIR" distclean || true
-            fi
+# There is no separate build directory: Emacs is configured and built
+# in-tree, directly inside $SRC_DIR.
+clean_build_tree_if_requested() {
+    if [[ "$CLEAN_BUILD" == true && -f "$SRC_DIR/Makefile" ]]; then
+        log "Running distclean"
+        if [[ "$PLATFORM" == "macOS" ]]; then
+            gmake -C "$SRC_DIR" distclean || true
+        else
+            make -C "$SRC_DIR" distclean || true
         fi
-
-        log "Removing build directory"
-        rm -rf "$BUILD_DIR"
     fi
-
-    mkdir -p "$BUILD_DIR"
 }
 
 ###############################################################################
@@ -298,84 +211,54 @@ fetch_remote_if_configured() {
 }
 
 fetch_all_remotes() {
-    fetch_remote_if_configured "$REMOTE_ORIGIN" || true
-    fetch_remote_if_configured "$REMOTE_UPSTREAM" || true
-    fetch_remote_if_configured "$REMOTE_UPSTREAM_MIRROR" || true
+    fetch_remote_if_configured origin
+    fetch_remote_if_configured upstream
+    fetch_remote_if_configured upstream-mirror
 }
 
 # Prints the remote to build the worktree from: upstream if reachable,
 # otherwise upstream-mirror.
 select_upstream_remote() {
-    if git -C "$SRC_DIR" remote get-url "$REMOTE_UPSTREAM" >/dev/null 2>&1 &&
-        git -C "$SRC_DIR" ls-remote "$REMOTE_UPSTREAM" >/dev/null 2>&1
+    if git -C "$SRC_DIR" remote get-url upstream >/dev/null 2>&1 &&
+        git -C "$SRC_DIR" ls-remote upstream >/dev/null 2>&1
     then
-        printf '%s\n' "$REMOTE_UPSTREAM"
+        printf '%s\n' upstream
         return 0
     fi
 
-    warn "$REMOTE_UPSTREAM is unreachable; falling back to $REMOTE_UPSTREAM_MIRROR"
+    warn "upstream is unreachable; falling back to upstream-mirror"
 
-    if git -C "$SRC_DIR" remote get-url "$REMOTE_UPSTREAM_MIRROR" >/dev/null 2>&1 &&
-        git -C "$SRC_DIR" ls-remote "$REMOTE_UPSTREAM_MIRROR" >/dev/null 2>&1
+    if git -C "$SRC_DIR" remote get-url upstream-mirror >/dev/null 2>&1 &&
+        git -C "$SRC_DIR" ls-remote upstream-mirror >/dev/null 2>&1
     then
-        printf '%s\n' "$REMOTE_UPSTREAM_MIRROR"
+        printf '%s\n' upstream-mirror
         return 0
     fi
 
-    error "Neither $REMOTE_UPSTREAM nor $REMOTE_UPSTREAM_MIRROR is reachable"
-}
-
-# Prints the name of the highest-versioned emacs-NN release branch
-# (e.g. emacs-30) available on the given remote.
-latest_stable_branch() {
-    local remote="$1"
-
-    git -C "$SRC_DIR" ls-remote --heads "$remote" 'emacs-[0-9]*' |
-        awk '{print $2}' |
-        sed 's#refs/heads/##' |
-        grep -E '^emacs-[0-9]+$' |
-        sort -t- -k2 -n |
-        tail -n1
+    error "Neither upstream nor upstream-mirror is reachable"
 }
 
 sync_worktree_with_upstream() {
     require_command git
 
-    log "Syncing worktree '$WORKTREE' with upstream"
+    log "Syncing worktree master with upstream"
 
     fetch_all_remotes
 
     local remote
     remote="$(select_upstream_remote)"
 
-    local target_branch
-    case "$WORKTREE" in
-        master)
-            target_branch="master"
-            ;;
-        stable)
-            target_branch="$(latest_stable_branch "$remote")"
-            [[ -n "$target_branch" ]] ||
-                error "Could not determine latest stable branch on $remote"
-            log "Latest stable branch on $remote: $target_branch"
-            ;;
-        *)
-            # Custom worktree name: assume it names a branch directly.
-            target_branch="$WORKTREE"
-            ;;
-    esac
+    log "Updating worktree to $remote/master"
 
-    log "Updating worktree to $remote/$target_branch"
+    git -C "$SRC_DIR" checkout -B master "$remote/master" ||
+        error "Failed to update worktree to $remote/master"
 
-    git -C "$SRC_DIR" checkout -B "$WORKTREE" "$remote/$target_branch" ||
-        error "Failed to update worktree to $remote/$target_branch"
-
-    if git -C "$SRC_DIR" remote get-url "$REMOTE_ORIGIN" >/dev/null 2>&1; then
-        log "Pushing updated worktree to $REMOTE_ORIGIN"
-        git -C "$SRC_DIR" push --force "$REMOTE_ORIGIN" "$WORKTREE:$WORKTREE" ||
-            warn "Failed to push updated worktree to $REMOTE_ORIGIN"
+    if git -C "$SRC_DIR" remote get-url origin >/dev/null 2>&1; then
+        log "Pushing updated worktree to origin"
+        git -C "$SRC_DIR" push --force origin master:master ||
+            warn "Failed to push updated worktree to origin"
     else
-        warn "Remote not configured: $REMOTE_ORIGIN (skipping push)"
+        warn "Remote not configured: origin (skipping push)"
     fi
 }
 
@@ -452,14 +335,22 @@ create_emacs_client_app() {
     local icons_dir="$1"
     local prefix="$2"
 
-    local client_app="$BUILD_DIR/nextstep/Emacs Client.app"
-    local client_script="$BUILD_DIR/emacs-client.applescript"
+    local client_app="$SRC_DIR/nextstep/Emacs Client.app"
+    local client_script="$SRC_DIR/emacs-client.applescript"
     local emacsclient="$prefix/bin/emacsclient"
 
     log "Creating Emacs Client.app"
 
     rm -rf "$client_app"
 
+    # Just connect to the Emacs daemon (installed as a LaunchAgent, see
+    # install_macos_daemon) and create a frame. Do NOT also `open -a
+    # 'Emacs'` afterwards: that used to launch a second, independent
+    # Emacs.app process on every click, which is what caused the
+    # double-open/freeze behavior. -a '' tells emacsclient to start the
+    # daemon itself as a fallback if it isn't already running; -n makes
+    # the call non-blocking so the AppleScript never hangs waiting for
+    # the frame to close.
     cat > "$client_script" <<EOF
 -- Emacs Client AppleScript Application
 -- Handles opening files from Finder, drag-and-drop, and launching from Spotlight/Dock
@@ -472,29 +363,17 @@ on open theDropped
             do shell script "$emacsclient -c -a '' -n " & dropPath
         end try
     end repeat
-
-    try
-        do shell script "open -a 'Emacs'"
-    end try
 end open
 
 on run
     try
         do shell script "$emacsclient -c -a '' -n"
     end try
-
-    try
-        do shell script "open -a 'Emacs'"
-    end try
 end run
 
 on open location this_URL
     try
         do shell script "$emacsclient -n " & quoted form of this_URL
-    end try
-
-    try
-        do shell script "open -a 'Emacs'"
     end try
 end open location
 EOF
@@ -614,16 +493,6 @@ EOF
     /usr/libexec/PlistBuddy \
         -c 'Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string org-protocol' \
         "$plist"
-
-    rm -f \
-        "$client_app/Contents/Resources/droplet.icns" \
-        "$client_app/Contents/Resources/droplet.rsrc" \
-        "$client_app/Contents/Resources/Assets.car"
-
-    if [[ -f "$icons_dir/Emacs.icns" ]]; then
-        cp "$icons_dir/Emacs.icns" \
-            "$client_app/Contents/Resources/applet.icns"
-    fi
 }
 
 ###############################################################################
@@ -658,7 +527,7 @@ apply_png_icon_macos() {
 
     log "Creating macOS icon from $png_file"
 
-    local iconset_dir="$BUILD_DIR/Emacs.iconset"
+    local iconset_dir="$SRC_DIR/Emacs.iconset"
 
     rm -rf "$iconset_dir"
     mkdir -p "$iconset_dir"
@@ -727,7 +596,7 @@ create_emacs_bin_proxy() {
 #!/usr/bin/env bash
 
 for app in \
-    "$prefix/Emacs.app" \
+    "$prefix/share/applications/Emacs.app" \
     "/Applications/Emacs.app" \
     "\$HOME/Applications/Emacs.app"
 do
@@ -737,7 +606,7 @@ do
 done
 
 echo "Error: Emacs.app not found in:" >&2
-echo "  $prefix/Emacs.app" >&2
+echo "  $prefix/share/applications/Emacs.app" >&2
 echo "  /Applications/Emacs.app" >&2
 echo "  \$HOME/Applications/Emacs.app" >&2
 
@@ -786,60 +655,67 @@ inject_macos_environment() {
 }
 
 ###############################################################################
-# macOS post-install fixups
+# macOS daemon
 ###############################################################################
 
-# For --with-ns builds, 'gmake install' does not reliably place a working
-# emacsclient at $install_prefix/bin. Copy the one built in lib-src
-# directly if that happened.
-ensure_emacsclient_installed() {
-    local install_prefix="$1"
-    local emacsclient_path="$install_prefix/bin/emacsclient"
-
-    if [[ -x "$emacsclient_path" ]]; then
-        return 0
-    fi
-
-    warn "emacsclient missing from $install_prefix/bin after 'gmake install'; copying it directly"
-
-    local built_emacsclient="$BUILD_DIR/lib-src/emacsclient"
-
-    [[ -x "$built_emacsclient" ]] ||
-        error "Could not find built emacsclient: $built_emacsclient"
-
-    mkdir -p "$install_prefix/bin"
-    cp "$built_emacsclient" "$emacsclient_path"
-    chmod +x "$emacsclient_path"
-}
-
-# The native-comp eln loader looks for compiled Lisp relative to the
-# installed binary's own directory, at "$bindir/../native-lisp" (visible
-# in native-comp load errors as "execdir $install_prefix/bin/"). 'gmake
-# install' instead places eln files under lib/emacs/<version>/native-lisp,
-# so create a matching symlink where Emacs actually looks.
-link_native_lisp_for_bindir_lookup() {
+# Run Emacs as a persistent background daemon via launchd, so
+# emacsclient always has something to connect to. Without this,
+# emacsclient's "-a ''" fallback (and a manually double-clicked
+# Emacs.app on top of it) ends up spawning multiple independent Emacs
+# processes that fight over the same native-comp cache, which is the
+# most likely cause of the double-open/freeze behavior.
+install_macos_daemon() {
     local install_prefix="$1"
 
-    local native_lisp_src
-    native_lisp_src="$(
-        find "$install_prefix/lib/emacs" \
-            -mindepth 2 \
-            -maxdepth 2 \
-            -type d \
-            -name native-lisp \
-            2>/dev/null |
-            head -n 1
-    )"
+    local emacs_bin="$install_prefix/bin/emacs"
+    local plist_dir="$HOME/Library/LaunchAgents"
+    local plist_file="$plist_dir/org.gnu.Emacs.plist"
+    local log_dir="$HOME/Library/Logs"
 
-    if [[ -z "$native_lisp_src" ]]; then
-        warn "Could not find an installed native-lisp directory under $install_prefix/lib/emacs"
-        return 0
-    fi
+    log "Installing Emacs daemon LaunchAgent"
 
-    log "Linking $install_prefix/native-lisp -> $native_lisp_src"
+    mkdir -p "$plist_dir" "$log_dir"
 
-    rm -rf "$install_prefix/native-lisp"
-    ln -s "$native_lisp_src" "$install_prefix/native-lisp"
+    cat > "$plist_file" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>org.gnu.Emacs</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$emacs_bin</string>
+        <string>--fg-daemon</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>$PATH</string>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>$log_dir/emacs-daemon.log</string>
+    <key>StandardErrorPath</key>
+    <string>$log_dir/emacs-daemon.log</string>
+</dict>
+</plist>
+PLIST
+
+    local uid
+    uid="$(id -u)"
+
+    launchctl bootout "gui/$uid" "$plist_file" 2>/dev/null || true
+    launchctl bootstrap "gui/$uid" "$plist_file" ||
+        warn "Failed to bootstrap Emacs daemon LaunchAgent"
+    launchctl enable "gui/$uid/org.gnu.Emacs" 2>/dev/null || true
+    launchctl kickstart -k "gui/$uid/org.gnu.Emacs" ||
+        warn "Failed to start Emacs daemon"
 }
 
 ###############################################################################
@@ -865,7 +741,7 @@ install_macos() {
 
     brew install "${brew_build_dependencies[@]}"
 
-    prepare_build_directory
+    clean_build_tree_if_requested
 
     local brew_prefix
     brew_prefix="$(macos_brew_prefix)"
@@ -875,7 +751,8 @@ install_macos() {
     mkdir -p \
         "$install_prefix/bin" \
         "$install_prefix/share/emacs/site-lisp" \
-        "$install_prefix/share/info/emacs"
+        "$install_prefix/share/info/emacs" \
+        "$APPS_DIR"
 
     local sqlite_prefix
     sqlite_prefix="$(brew --prefix sqlite)"
@@ -915,14 +792,6 @@ install_macos() {
         warn "Could not locate libemutls_w.a"
         warn "Native compilation from GUI Emacs may fail to link native modules."
     fi
-
-    local native_comp_flag
-    case "$NATIVE_COMP" in
-        aot)      native_comp_flag="--with-native-compilation=aot" ;;
-        deferred) native_comp_flag="--with-native-compilation" ;;
-        no)       native_comp_flag="--without-native-compilation" ;;
-        *)        error "Invalid NATIVE_COMP value: $NATIVE_COMP (use aot, deferred, or no)" ;;
-    esac
 
     local cflags=(
         "-DFD_SETSIZE=10000"
@@ -977,18 +846,11 @@ install_macos() {
     log "Running autogen.sh"
     ./autogen.sh
 
-    mkdir -p "$BUILD_DIR"
-    cd "$BUILD_DIR"
-
     log "Configuring Emacs"
 
-    "$SRC_DIR/configure" \
+    ./configure \
         --prefix="$install_prefix" \
-        --disable-dependency-tracking \
-        --disable-silent-rules \
-        --enable-locallisppath="$install_prefix/share/emacs/site-lisp" \
-        --infodir="$install_prefix/share/info/emacs" \
-        "$native_comp_flag" \
+        --with-native-compilation=aot \
         --with-ns \
         --disable-ns-self-contained \
         --with-modules \
@@ -1004,18 +866,16 @@ install_macos() {
     export LDFLAGS="${ldflags[*]}"
     export LIBRARY_PATH="$library_path"
 
-    log "Building Emacs using $(sysctl -n hw.ncpu) CPU cores"
-
     # Deeply recursive batch operations during the build (wisent/bovine
     # grammar table generation, leim-list.el generation via quail) can
-    # overflow the default 8 MiB stack and crash bootstrap-emacs with a
-    # segfault/abort rather than a clean error. This is a long-standing
-    # macOS issue documented in Emacs's own etc/PROBLEMS file. Raise the
-    # soft limit to the hard limit before building.
+    # overflow the default 8 MiB stack. Raise the soft limit to the hard
+    # limit before building.
     local stack_hard_limit
     stack_hard_limit="$(ulimit -Hs)"
     ulimit -s "$stack_hard_limit" 2>/dev/null ||
         warn "Could not raise stack size limit (currently $(ulimit -s)); grammar/leim generation may segfault"
+
+    log "Building Emacs using $(sysctl -n hw.ncpu) CPU cores"
 
     gmake -j"$(sysctl -n hw.ncpu)"
 
@@ -1023,28 +883,19 @@ install_macos() {
 
     gmake install
 
-    ensure_emacsclient_installed "$install_prefix"
-    link_native_lisp_for_bindir_lookup "$install_prefix"
-
-    local build_app="$BUILD_DIR/nextstep/Emacs.app"
-    local build_client="$BUILD_DIR/nextstep/Emacs Client.app"
+    local build_app="$SRC_DIR/nextstep/Emacs.app"
+    local build_client="$SRC_DIR/nextstep/Emacs Client.app"
 
     [[ -d "$build_app" ]] ||
         error "Built Emacs.app not found: $build_app"
 
-    # The important Emacs+ behavior:
-    #
-    #   build/nextstep/Emacs.app
-    #              ↓
-    #       INSTALL_PREFIX/Emacs.app
-    #
-    # Do not make ~/Applications the canonical installation.
-    log "Installing Emacs.app into $install_prefix"
+    log "Installing Emacs.app into $APPS_DIR"
 
-    rm -rf "$install_prefix/Emacs.app"
-    cp -R "$build_app" "$install_prefix/Emacs.app"
+    rm -rf "$APPS_DIR/Emacs.app"
+    cp -R "$build_app" "$APPS_DIR/Emacs.app"
 
-    local installed_app="$install_prefix/Emacs.app"
+    local installed_app="$APPS_DIR/Emacs.app"
+    local installed_app_client="$APPS_DIR/Emacs Client.app"
 
     # Remove stale resources that can interfere with the application icon on
     # newer macOS versions.
@@ -1060,12 +911,12 @@ install_macos() {
         "$installed_app/Contents/Resources" \
         "$install_prefix"
 
-    log "Installing Emacs Client.app into $install_prefix"
+    log "Installing Emacs Client.app into $APPS_DIR"
 
-    rm -rf "$install_prefix/Emacs Client.app"
+    rm -rf "$APPS_DIR/Emacs Client.app"
 
     if [[ -d "$build_client" ]]; then
-        cp -R "$build_client" "$install_prefix/Emacs Client.app"
+        cp -R "$build_client" "$APPS_DIR/Emacs Client.app"
     else
         error "Emacs Client.app was not created"
     fi
@@ -1094,7 +945,7 @@ install_macos() {
         --force \
         --deep \
         --sign - \
-        "$install_prefix/Emacs Client.app"
+        "$installed_app_client"
 
     # Optional convenience copies.
     #
@@ -1111,34 +962,31 @@ install_macos() {
 
     rm -rf "$HOME/Applications/Emacs Client.app"
     cp -R \
-        "$install_prefix/Emacs Client.app" \
+        "$installed_app_client" \
         "$HOME/Applications/Emacs Client.app"
+
+    # Start (or restart) the daemon so emacsclient/Emacs Client.app has
+    # something stable to connect to. If Emacs is currently running
+    # standalone (not as a daemon), quit it first, or you'll end up with
+    # two independent Emacs processes contending over the same
+    # native-comp cache.
+    install_macos_daemon "$install_prefix"
 
     echo
     echo "--------------------------------------------------"
     echo "✅ macOS Emacs build complete"
     echo
-    echo "   Worktree:     $WORKTREE"
-    echo "   Build:        $BUILD_DIR"
+    echo "   Source:       $SRC_DIR"
     echo "   Prefix:       $install_prefix"
-    echo "   Emacs.app:    $install_prefix/Emacs.app"
-    echo "   Client.app:   $install_prefix/Emacs Client.app"
+    echo "   Emacs.app:    $installed_app"
+    echo "   Client.app:   $installed_app_client"
     echo
     echo "   Finder copy:  $HOME/Applications/Emacs.app"
     echo "   Client copy:  $HOME/Applications/Emacs Client.app"
     echo
-    echo "   Native Comp:  $NATIVE_COMP"
-    echo "   Tree-Sitter:  yes"
-    echo "   GnuTLS:       yes"
-    echo "   RSVG:         yes"
-    echo "   WebP:         yes"
-    echo "   Modules:      yes"
+    echo "   Daemon:       launchctl print gui/\$(id -u)/org.gnu.Emacs"
     echo "--------------------------------------------------"
 }
-
-###############################################################################
-# macOS uninstall
-###############################################################################
 
 uninstall_macos() {
     require_command launchctl
@@ -1160,8 +1008,8 @@ uninstall_macos() {
     fi
 
     local paths=(
-        "$INSTALL_PREFIX/Emacs.app"
-        "$INSTALL_PREFIX/Emacs Client.app"
+        "$APPS_DIR/Emacs.app"
+        "$APPS_DIR/Emacs Client.app"
         "$INSTALL_PREFIX/bin/emacs"
         "$HOME/Applications/Emacs.app"
         "$HOME/Applications/Emacs Client.app"
@@ -1182,8 +1030,8 @@ uninstall_macos() {
 ###############################################################################
 
 status_macos() {
-    local emacs_app="$INSTALL_PREFIX/Emacs.app"
-    local client_app="$INSTALL_PREFIX/Emacs Client.app"
+    local emacs_app="$APPS_DIR/Emacs.app"
+    local client_app="$APPS_DIR/Emacs Client.app"
 
     echo "Emacs installation:"
     echo
@@ -1299,30 +1147,20 @@ install_arch() {
         base-devel \
         "${arch_build_dependencies[@]}"
 
-    prepare_build_directory
+    clean_build_tree_if_requested
 
     cd "$SRC_DIR"
 
     log "Running autogen.sh"
     ./autogen.sh
 
-    mkdir -p "$BUILD_DIR"
-    cd "$BUILD_DIR"
-
-    local native_comp_flag
-    case "$NATIVE_COMP" in
-        aot)      native_comp_flag="--with-native-compilation=aot" ;;
-        deferred) native_comp_flag="--with-native-compilation" ;;
-        no)       native_comp_flag="--without-native-compilation" ;;
-        *)        error "Invalid NATIVE_COMP value: $NATIVE_COMP (use aot, deferred, or no)" ;;
-    esac
 
     log "Configuring Emacs for PGTK"
 
-    "$SRC_DIR/configure" \
+    ./configure \
         --prefix="/usr/local" \
         --with-pgtk \
-        "$native_comp_flag" \
+        --with-native-compilation=aot \
         --with-tree-sitter \
         --with-modules \
         --with-json \
@@ -1383,11 +1221,9 @@ install_arch() {
     echo "--------------------------------------------------"
     echo "✅ Arch Linux Emacs build complete"
     echo
-    echo "   Worktree:     $WORKTREE"
-    echo "   Build:        $BUILD_DIR"
+    echo "   Source:       $SRC_DIR"
     echo "   Installation: /usr/local"
     echo "   PGTK:         yes"
-    echo "   Native Comp:  $NATIVE_COMP"
     echo "   Tree-Sitter:  yes"
     echo "   LTO:          yes"
     echo "--------------------------------------------------"
@@ -1408,11 +1244,6 @@ uninstall_arch() {
 
         systemctl --user disable --now emacs.service 2>/dev/null || true
         systemctl --user daemon-reload
-    fi
-
-    if [[ -d "$BUILD_DIR" ]]; then
-        log "Removing build directory"
-        rm -rf "$BUILD_DIR"
     fi
 
     local files=(
