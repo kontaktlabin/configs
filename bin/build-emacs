@@ -213,7 +213,10 @@ EOF
     rm -f "$script"
 
     /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string org.gnu.EmacsClient" "$client_app/Contents/Info.plist" 2>/dev/null || true
-    /usr/libexec/PlistBuddy -c "Add :CFBundleName string 'Emacs Client'" "$client_app/Contents/Info.plist" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :CFBundleName string 'Emacs Client'" "$client_app/Contents/Info.plist" 2>/dev/null || \
+        /usr/libexec/PlistBuddy -c "Set :CFBundleName 'Emacs Client'" "$client_app/Contents/Info.plist" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string 'Emacs Client'" "$client_app/Contents/Info.plist" 2>/dev/null || \
+        /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName 'Emacs Client'" "$client_app/Contents/Info.plist" 2>/dev/null || true
 }
 
 ###############################################################################
@@ -259,6 +262,25 @@ setup_launchagent() {
     log "Configuring macOS LaunchAgent daemon"
     mkdir -p "$(dirname "$PLIST_FILE")"
 
+    local brew_prefix
+    brew_prefix="$(brew --prefix)" 2>/dev/null || brew_prefix="/opt/homebrew"
+
+    local gcc_version
+    gcc_version="$(brew info --json=v2 gcc | jq -r '.formulae[0].installed[0].version // empty' | head -n 1)" 2>/dev/null || true
+    local gcc_major="${gcc_version%%.*}"
+    local gcc_lib="$brew_prefix/lib/gcc/$gcc_major"
+    local libgccjit_prefix="$brew_prefix/opt/libgccjit"
+
+    local gcc_current="$brew_prefix/opt/gcc/lib/gcc/current"
+    local emutls_dir=""
+    if [[ -d "$gcc_current/gcc" ]]; then
+        emutls_dir="$(find "$gcc_current/gcc" -type f -name "libemutls_w.a" -exec dirname {} \; | head -n 1)"
+    fi
+
+    local daemon_library_path="$gcc_lib:$libgccjit_prefix/lib/gcc/current:$brew_prefix/lib"
+    [[ -n "$emutls_dir" ]] && daemon_library_path="$emutls_dir:$daemon_library_path"
+    local daemon_path="$brew_prefix/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
     cat <<EOF > "$PLIST_FILE"
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -271,6 +293,13 @@ setup_launchagent() {
         <string>$APPS_DIR/Emacs.app/Contents/MacOS/Emacs</string>
         <string>--fg-daemon</string>
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>LIBRARY_PATH</key>
+        <string>$daemon_library_path</string>
+        <key>PATH</key>
+        <string>$daemon_path</string>
+    </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
@@ -364,10 +393,19 @@ build_macos() {
     local gcc_major="${gcc_version%%.*}"
     local gcc_lib="$brew_prefix/lib/gcc/$gcc_major"
 
+    # Locate libemutls_w.a dynamically for native-compilation TLS support
+    local gcc_current="$brew_prefix/opt/gcc/lib/gcc/current"
+    local emutls_dir=""
+    if [[ -d "$gcc_current/gcc" ]]; then
+        emutls_dir="$(find "$gcc_current/gcc" -type f -name "libemutls_w.a" -exec dirname {} \; | head -n 1)"
+    fi
+
     export PATH="$brew_prefix/opt/make/libexec/gnubin:$brew_prefix/bin:$PATH"
     export CFLAGS="-DFD_SETSIZE=10000 -DDARWIN_UNLIMITED_SELECT -I$sqlite_prefix/include -I$gcc_prefix/include -I$libgccjit_prefix/include"
     export LDFLAGS="-L$sqlite_prefix/lib -L$gcc_lib -Wl,-rpath,$gcc_lib"
+    [[ -n "$emutls_dir" ]] && export LDFLAGS="$LDFLAGS -L$emutls_dir"
     export LIBRARY_PATH="$gcc_lib:$libgccjit_prefix/lib/gcc/current:$brew_prefix/lib"
+    [[ -n "$emutls_dir" ]] && export LIBRARY_PATH="$emutls_dir:$LIBRARY_PATH"
 
     if [[ "$FLAG_NO_RECONFIGURE" == false ]]; then
         configure_macos
@@ -386,6 +424,14 @@ build_macos() {
     mkdir -p "$APPS_DIR" "$INSTALL_PREFIX/bin"
     rm -rf "$installed_app"
     cp -R "$built_app" "$installed_app"
+
+    # Inject LSEnvironment into Info.plist for app launcher/Finder executions
+    if [[ -n "$emutls_dir" ]]; then
+        log "Injecting LIBRARY_PATH into Emacs.app Info.plist for libemutls_w.a"
+        /usr/libexec/PlistBuddy -c "Add :LSEnvironment dict" "$installed_app/Contents/Info.plist" 2>/dev/null || true
+        /usr/libexec/PlistBuddy -c "Set :LSEnvironment:LIBRARY_PATH '$LIBRARY_PATH'" "$installed_app/Contents/Info.plist" 2>/dev/null || \
+        /usr/libexec/PlistBuddy -c "Add :LSEnvironment:LIBRARY_PATH string '$LIBRARY_PATH'" "$installed_app/Contents/Info.plist" 2>/dev/null || true
+    fi
 
     apply_png_icon_macos "$installed_app"
     create_emacs_bin_proxy "$installed_app" "$INSTALL_PREFIX/bin/emacs"
@@ -468,6 +514,7 @@ configure_arch() {
         --with-webp \
         --with-xml2 \
         --with-cairo \
+        --with-mailutils \
         --without-compress-install
 }
 
@@ -485,6 +532,11 @@ build_arch() {
 
     log "Installing Arch dependencies"
     sudo pacman -S --needed base-devel "${arch_build_dependencies[@]}"
+
+    # Expose standard and local paths so pkg-config and linker can find leancrypto
+    export PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/local/lib/pkgconfig:/usr/share/pkgconfig:${PKG_CONFIG_PATH:-}"
+    export LDFLAGS="-L/usr/local/lib -L/usr/lib ${LDFLAGS:-}"
+    export CFLAGS="-I/usr/local/include -I/usr/include ${CFLAGS:-}"
 
     if [[ "$FLAG_NO_RECONFIGURE" == false ]]; then
         configure_arch
