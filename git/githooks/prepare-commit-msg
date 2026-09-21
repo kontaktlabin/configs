@@ -23,7 +23,7 @@ if ! echo "$CURRENT_CONTENT" | grep -qE '^[^[:space:]#]'; then
     # comments remain visible at the bottom.
     TEMP_FILE=$(mktemp)
     {
-        printf "type - scope: ${{SUBJECT}}\n\n${{BODY}}\n\n"
+        printf '!!TYPE!! - !!SCOPE!!: !!SUBJECT!!\n\n!!BODY!!\n\n'
         printf "# ----------------------------------------------------------------------------------------\n"
         printf "# COMMIT GUIDE:\n"
         printf "# Format: <type> - <scope>: <subject>\n"
