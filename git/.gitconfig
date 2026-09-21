@@ -1,6 +1,6 @@
 [core]
 	editor = emacs
-	hooksPath = /home/labin/ws/i/configs/progs/git/githooks/
+	hooksPath = /home/labin/ws/i/configs/git/githooks/
 
 [user]
 email = kontaktlabin@gmail.com
