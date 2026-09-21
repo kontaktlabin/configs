@@ -1,0 +1,42 @@
+-- 1. General Settings
+-- Don't show the "Help" message at startup
+\set QUIET 1
+-- Persist command history
+\set HISTFILE ~/.psql_history
+
+-- 2. Formatting & Display
+-- Auto-enable vertical expanded mode for wide tables
+\x auto
+-- Show how long each query takes to run
+\timing on
+-- Use a friendly string for NULL values
+\pset null '∅'
+-- Use unicode for borders and lines
+\pset linestyle unicode
+-- Add more structure to table borders
+\pset border 2
+-- Capitalize SQL keywords for better readability
+\set COMP_KEYWORD_CASE upper
+
+-- 3. Custom Prompts
+-- Format: [user@host:database] (status) #
+-- Using ANSI colors for better visibility:
+-- User=Green, Host=Blue, DB=Yellow
+\set PROMPT1 '%[%033[1;32m%]%n%[%033[0m%]@%[%033[1;34m%]%M%[%033[0m%]:%[%033[1;33m%]%/%[%033[0m%] %R%# '
+-- Minimal prompt for multi-line queries
+\set PROMPT2 '[more] %R > '
+
+-- 4. Custom Aliases (Shorthand)
+-- Usage: Type :alias inside psql to run the query
+\set uptime 'SELECT now() - pg_postmaster_start_time() AS uptime;'
+\set table_sizes 'SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class WHERE relkind = \'r\' ORDER BY pg_total_relation_size(oid) DESC LIMIT 10;'
+\set dt_size 'SELECT relname, pg_size_pretty(pg_total_relation_size(oid)) FROM pg_class WHERE relkind = \'r\' ORDER BY pg_total_relation_size(oid) DESC;'
+\set conn_info 'SELECT current_user, current_database(), inet_server_addr(), inet_server_port();'
+\set db_list '\l'
+\set role_list '\du'
+\set table_list '\dt'
+\set index_list '\di'
+
+-- Turn quiet mode off at the end
+\set QUIET 0
+
