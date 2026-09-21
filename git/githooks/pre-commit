@@ -1,0 +1,84 @@
+#!/bin/sh
+
+# Runs before any commit. General pre-commit linting and checks.
+
+echo "--- Running Pre-Commit Checks ---"
+
+# Get list of staged files (Added, Copied, Modified, Renamed)
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACMR)
+
+if [ -z "$STAGED_FILES" ]; then
+    echo "No staged files to check."
+    exit 0
+fi
+
+PYTHON_FILES=""
+JS_FILES=""
+
+for file in $STAGED_FILES; do
+    if [ ! -f "$file" ]; then continue; fi
+
+    # Detect type via shebang or extension
+    TYPE="other"
+    # Read first line and check for shebang
+    SHEBANG=$(head -n 1 "$file" 2>/dev/null | grep '^#!' || true)
+
+    if [ -n "$SHEBANG" ]; then
+        case "$SHEBANG" in
+            *python*) TYPE="python" ;;
+            *node*)   TYPE="node"   ;;
+            *)        TYPE="other"  ;;
+        esac
+    else
+        case "$file" in
+            *.py)    TYPE="python" ;;
+            *.js|*.ts|*.jsx|*.tsx) TYPE="node" ;;
+            *)       TYPE="other"  ;;
+        esac
+    fi
+
+    # Group files
+    case "$TYPE" in
+        python) PYTHON_FILES="$PYTHON_FILES $file" ;;
+        node)   JS_FILES="$JS_FILES $file" ;;
+    esac
+done
+
+# --- Linter Execution ---
+
+# Python Check
+if [ -n "$PYTHON_FILES" ]; then
+    if command -v ruff >/dev/null 2>&1; then
+        echo "Running Ruff on Python files..."
+        if ! ruff check $PYTHON_FILES; then
+            echo "ERROR: Ruff linting failed. Please fix the issues reported above."
+            exit 1
+        fi
+    else
+        echo "======================================================================================="
+        echo "🚨 ERROR: Python files detected in commit, but 'ruff' is not installed."
+        echo "Please install ruff to satisfy the pre-commit requirements."
+        echo "======================================================================================="
+        exit 1
+    fi
+fi
+
+# JS/TS Check
+if [ -n "$JS_FILES" ]; then
+    if command -v eslint >/dev/null 2>&1; then
+        echo "Running ESLint on JS/TS files..."
+        if ! eslint $JS_FILES; then
+            echo "ERROR: ESLint linting failed. Please fix the issues reported above."
+            exit 1
+        fi
+    else
+        echo "======================================================================================="
+        echo "🚨 ERROR: JS/TS files detected in commit, but 'eslint' is not installed."
+        echo "Please install eslint to satisfy the pre-commit requirements."
+        echo "======================================================================================="
+        exit 1
+    fi
+fi
+
+echo "Pre-commit linting checks passed successfully."
+exit 0

@@ -1,0 +1,38 @@
+#!/bin/sh
+
+# Runs before commit-msg. Used to inject unique, structured metadata and ensure message quality.
+# $1: path to the message file.
+# $2: commit mode (e.g., message, merge, squash, etc.)
+
+COMMIT_MSG_FILE=$1
+COMMIT_MODE=$2
+
+# 1. Handle Merge/Squash/Fixup: Let Git handle these messages automatically.
+if [ "$COMMIT_MODE" = "merge" ] || [ "$COMMIT_MODE" = "squash" ] || [ "$COMMIT_MODE" = "fixup" ]; then
+    exit 0
+fi
+
+# 2. Check if the message is empty or only contains whitespace/comments.
+# The logic below checks if there is ANY line that is NOT just whitespace or a comment.
+# If no such line is found, it means the file is effectively empty for our purposes.
+CURRENT_CONTENT=$(cat "$COMMIT_MSG_FILE")
+if ! echo "$CURRENT_CONTENT" | grep -qE '^[^[:space:]#]'; then
+
+    # 3. Construct a professional, structured template.
+    # We prepend it to the existing content so that Git's helpful
+    # comments remain visible at the bottom.
+    TEMP_FILE=$(mktemp)
+    {
+        printf "type - scope: ${{SUBJECT}}\n\n${{BODY}}\n\n"
+        printf "# ----------------------------------------------------------------------------------------\n"
+        printf "# COMMIT GUIDE:\n"
+        printf "# Format: <type> - <scope>: <subject>\n"
+        printf "# Example: feat - api: add user authentication\n"
+        printf "# Valid types: feat, fix, docs, chore, refactor, perf, build, ci, test, revert, clean\n"
+        printf "# ----------------------------------------------------------------------------------------\n\n"
+        cat "$COMMIT_MSG_FILE"
+    } > "$TEMP_FILE" && mv "$TEMP_FILE" "$COMMIT_MSG_FILE"
+
+fi
+
+exit 0
