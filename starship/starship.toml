@@ -4,14 +4,13 @@
 add_newline = true
 
 # Master format: single line of context modules, followed by a newline and the character
-format = """$directory$git_branch$git_status$time\n$character"""
+format = """$directory$git_branch$git_status\n$time $character"""
 
 [time]
 disabled = false
 style = "dimmed cyan"
 format = "[$time]($style)"
 time_format = "%H:%M:%S"
-time_range = "10:00:00-14:00:00"
 
 # --- Action Module (Line 2) ---
 
