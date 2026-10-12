@@ -11,7 +11,7 @@ Trigger this skill when:
 - The user wants to ensure code quality and style compliance.
 
 ## Precedence
-**Project-Specific Rules Overwrite Defaults**: If the project contains explicit configurations or scripts (e.g., `.eslintrc`, `pytest.ini`, `.ruff.toml`, `Makefile`, or custom `npm` scripts) that define linting or testing behavior, **always follow the project's local rules and commands** instead of the default procedures listed below.
+**Project-Specific Rules Overwrite Defaults**: If the project contains explicit configurations or scripts (e.g., `.eslintrc`, `pytest.ini`, `.ruff.toml`, `Makefile`, or custom `npm` scripts) that define behavior, **always follow the project's local rules and commands** instead of the default procedures or guidelines listed below.
 
 ## Procedures
 
