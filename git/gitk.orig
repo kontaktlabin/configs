@@ -1,0 +1,22 @@
+set autocopy 0
+set autoselect 1
+set autosellen 40
+set bgcolor #1e1e1e
+set fgcolor #d4d4d4
+set uifgcolor #d4d4d4
+set uibgcolor #2d2d2d
+set selectbgcolor #004d4d
+set foundbgcolor #005f5f
+set currentsearchhitbgcolor #007f7f
+set markbgcolor #333333
+set linkfgcolor #00cccc
+set linehoverfgcolor #ffffff
+set linehoveroutlinecolor #007f7f
+set mainheadcirclecolor #00cccc
+set workingfilescirclecolor #ffab91
+set indexcirclecolor #c5e1a5
+set circlecolors {#555555 #007f7f #777777 #00a3a3 #00cccc}
+set circleoutlinecolor #333333
+set cmitmode patch
+set colors {"#007f7f" "#00a3a3" "#00cccc" "#80cbc4" "#b39ddb" "#ffab91" "#c5e1a5"}
+set datetimeformat {%Y-%m-%d %H:%M:%S}

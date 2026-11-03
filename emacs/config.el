@@ -12,16 +12,23 @@
 
 (require 'package)
 
+;; 1. Define ALL valid repositories first so Emacs knows where to look
+(setq package-archives
+      '(("melpa"  . "https://melpa.org/packages/")
+        ("elpa"   . "https://elpa.gnu.org/packages/")
+        ("nongnu" . "https://elpa.nongnu.org/nongnu/")))
+
+;; 2. Initialize the package system
+(package-initialize)
+
+;; 3. Refresh the local cache ONLY if Emacs doesn't have one cached yet
+(unless package-archive-contents
+  (package-refresh-contents))
+
 ;; This code eliminates the need to type :ensure t for each package download.
 (require 'use-package)
 (require 'use-package-ensure)
 (setq use-package-always-ensure t)
-
-;; MELPA provides community packages; ELPA/Nongnu provide GNU packages.
-(setq package-archives
-      '(("melpa" . "https://melpa.org/packages/")
-        ("elpa"  . "https://elpa.gnu.org/packages/")
-        ("nongnu" . "https://elpa.nongnu.org/nongnu/")))
 
 ;; Improves startup times by allowing Emacs to precompute and generate a single, large autoload file.
 ;; Instead of re-computing them on every startup.
@@ -912,6 +919,16 @@
 
 ;; Allow Transient menus to expose the full configured command hierarchy.
 (setq transient-default-level 7)
+
+(use-package magit-difftastic
+ :ensure t
+ :demand t
+ :config
+ ;; Force it to default to a side-by-side layout inside Magit
+ (setq magit-difftastic-display-mode 'side-by-side)
+
+ ;; Turn on the global minor mode to replace stock Magit rendering
+ (magit-difftastic-mode 1))
 
 (use-package org
   :defer t

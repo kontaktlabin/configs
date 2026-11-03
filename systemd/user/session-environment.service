@@ -1,0 +1,10 @@
+[Unit]
+Description=Set system-wide user environment variables
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash /home/labin/ws/i/configs/bin/session-environment.sh
+
+[Install]
+WantedBy=default.target

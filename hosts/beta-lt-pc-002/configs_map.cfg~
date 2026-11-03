@@ -1,0 +1,32 @@
+[mkarch.network.hm]
+type = static
+interface = en*
+ip = 192.168.10.5/24
+gateway = 192.168.10.1
+dns = 1.1.1.1
+
+[mkarch.network.beta]
+type = dhcp
+interface = en*
+
+[mkarch.packages]
+emacs
+git
+sudo
+openssh
+
+[mappings]
+$HOME/.config/environment.d = $HOME/ws/i/configs/environment.d
+$HOME/.config/systemd/user/session-environment.service = $HOME/ws/i/configs/systemd/user/session-environment.service
+$HOME/.config/opencode/opencode.jsonc = $CONFIGS_DIR/opencode/opencode.jsonc
+$HOME/.config/opencode/tui.jsonc = $CONFIGS_DIR/opencode/tui.jsonc
+$HOME/.bashrc = $CONFIGS_DIR/bash/.bashrc
+$HOME/.bash_profile = $CONFIGS_DIR/bash/.bash_profile
+$HOME/.config/opencode/AGENTS.md = $CONFIGS_DIR/opencode/AGENTS.md
+$HOME/.config/opencode/agents = $CONFIGS_DIR/opencode/agents
+$HOME/ws/i/configs/hermes/config.yaml = $HOME/ws/e/nous-research/hermes/config.yaml
+$HOME/ws/e/nous-research/hermes/config.yaml = $CONFIGS_DIR/hermes/config.yaml
+$HOME/ws/e/nous-research/hermes/SOUL.md = $CONFIGS_DIR/hermes/SOUL.md
+$HOME/ws/e/nous-research/hermes/skills = $CONFIGS_DIR/hermes/skills
+$HOME/ws/i/configs/hermes/hermes-agent/AGENTS.md = $CONFIGS_DIR/hermes/AGENTS.md
+

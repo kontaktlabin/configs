@@ -281,7 +281,7 @@ Launches automated deep initialization routines to verify folder architectures, 
 
 #+BEGIN_SRC shell
   echo "=== Executing Baseline Internal Workspace Setup Scripts ==="
-  SETUP_WS_SCRIPT = $HOME/ws/i/configs/scripts/setup-ws
+  SETUP_WS_SCRIPT = $HOME/ws/c/scripts/setup-ws
   if [ -x "$SETUP_WS_SCRIPT" ]; then
     "$SETUP_WS_SCRIPT"
   else
@@ -294,7 +294,7 @@ Applies initial adjustments and registers active symlink matrices into place usi
 
 #+BEGIN_SRC shell
   echo "=== Running Configuration Post-Install Alignment Triggers ==="
-  CONFIGS_ENGINE="$HOME/ws/i/configs/scripts/configs"
+  CONFIGS_ENGINE="$HOME/ws/c/scripts/configs"
 
   if [ -x "$CONFIGS_ENGINE" ]; then
       echo "🚀 Found configs engine script. Linking structural mapping matrix..."
@@ -307,7 +307,7 @@ Applies initial adjustments and registers active symlink matrices into place usi
 * Editors
 
 ** emacs
-    Start as a daemon on system start 
+    Start as a daemon on system start
 #+BEGIN_SRC shell
 	systemctl --user enable emacs
 #+END_SRC

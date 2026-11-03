@@ -1,0 +1,90 @@
+#+TITLE: Static Network Configuration for Arch Linux ARM (RPI3)
+* Overview
+This file details the manual configuration steps for establishing static LAN and Wi-Fi connectivity on Arch Linux ARM, specifically using `systemd-networkd` and `wpa_supplicant`.
+
+* **System Prerequisites**
+This guide assumes you are using Arch Linux ARM and have the following packages installed:
+- `systemd-networkd`
+- `wpa_supplicant`
+- `ip` (for verification)
+
+* **Part 1: Static IP Configuration (LAN and Wi-Fi)**
+These files define the desired network parameters and must be placed in `/etc/systemd/network/`.
+
+**1. Ethernet (LAN) Configuration
+This defines a static IP for your wired connection (`eth0`).
+
+`/etc/systemd/network/20-wired.network`:
+```ini
+[Match]
+Name=eth0       # Update this name if your LAN interface is different
+
+[Network]
+Address=192.168.10.2/24
+Gateway=192.168.10.1
+DNS=192.168.10.1
+
+[DHCPv4]
+RouteMetric=10
+```
+
+**2. Wi-Fi Configuration
+This defines a static IP for your wireless connection (`wlan0`).
+
+`/etc/systemd/network/25-wireless.network`:
+```ini
+[Match]
+Name=wlan0      # Update this name if your Wi-Fi interface is different
+
+[Network]
+Address=192.168.10.3/24
+Gateway=192.168.10.1
+DNS=192.168.10.1
+
+[DHCPv4]
+RouteMetric=20
+```
+
+* **Part 2: Wi-Fi Credential Setup**
+`wpa_supplicant` manages the actual connection negotiation using the configuration file.
+
+**1. Create Credential File**
+Create or edit the configuration file for your Wi-Fi interface.
+
+`sudo nano /etc/wpa_supplicant/wpa_supplicant-wlan0.conf`:
+```text
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=wheel
+update_config=1
+country=US # Change 'US' to your two-letter country code
+
+network={
+    ssid="YourWiFiName" # Replace with your network SSID
+    psk="YourWiFiPassword" # Replace with your Wi-Fi password
+}
+```
+
+* **Part 3: Service Activation & Verification**
+To ensure the network services are active and running correctly:
+
+**1. Enable Services**
+Start and enable the specific service for your wireless adapter.
+
+```bash
+# Enable the wpa_supplicant service specifically for wlan0
+sudo systemctl enable --now wpa_supplicant@wlan0.service
+
+# Restart systemd-networkd to apply all IP profiles
+sudo systemctl restart systemd-networkd.service
+```
+
+**2. Verify Connections**
+Confirm that both network interfaces have successfully acquired the intended IP addresses.
+
+```bash
+# Check interface addresses
+ip addr
+
+# Test basic connectivity and DNS resolution
+ip route
+ping -c 3 archlinuxarm.org
+```

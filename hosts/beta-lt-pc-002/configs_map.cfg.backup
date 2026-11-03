@@ -1,0 +1,19 @@
+[mkarch.network.hm]
+type = static
+interface = en*
+ip = 192.168.10.5/24
+gateway = 192.168.10.1
+dns = 1.1.1.1
+
+[mkarch.network.beta]
+type = dhcp
+interface = en*
+
+[mkarch.packages]
+emacs
+git
+sudo
+openssh
+
+[mappings]
+

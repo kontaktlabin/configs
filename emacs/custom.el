@@ -6,10 +6,10 @@
  ;; If there is more than one, they won't work right.
  '(package-selected-packages
    '(company dockerfile-mode expand-region flycheck gptel helm
-             indent-bars ligature lsp-mode lsp-ui magit marginalia
-             multi-vterm no-littering posframe undo-tree vertico vterm
-             vterm-toggle web-mode yafolding yaml-mode yasnippet
-             yasnippet-snippets)))
+             indent-bars ligature lsp-mode lsp-ui magit
+             magit-difftastic marginalia multi-vterm no-littering
+             posframe undo-tree vertico vterm vterm-toggle web-mode
+             yafolding yaml-mode yasnippet yasnippet-snippets)))
 (custom-set-faces
  ;; custom-set-faces was added by Custom.
  ;; If you edit it by hand, you could mess it up, so be careful.
