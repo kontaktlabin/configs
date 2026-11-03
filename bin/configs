@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import shutil
-import subprocess
 import configparser
+import os
+import shutil
 import socket
+import subprocess
+import sys
 from pathlib import Path
 
 # ── Configuration Constants ───────────────────────────────────────────────────
@@ -19,7 +19,7 @@ def ensure_env(map_file: Path):
         if not map_file.exists():
             with open(map_file, 'w') as f:
                 f.write("[mappings]\n")
-    except IOError as e:
+    except OSError as e:
         print(f"❌ Critical Environment Failure: Unable to setup configuration directory. Error: {e}")
         sys.exit(1)
 
@@ -94,7 +94,7 @@ def map_add(abs_dest, abs_src, map_file: Path):
             config.write(f)
         print(f"💾 Database: Appended raw mapping entry to {map_file}")
         print(f"   ↳ Target: {raw_dest}\n   ↳ Source: {raw_src}")
-    except IOError as e:
+    except OSError as e:
         print(f"❌ Error: Failed to write entry to configuration mapping file. Error: {e}")
 
 def map_remove(abs_dest, map_file: Path):
@@ -111,7 +111,7 @@ def map_remove(abs_dest, map_file: Path):
         with open(map_file, 'w') as f:
             config.write(f)
         print(f"🗑️  Database: Removed entry [{raw_dest}] from {map_file}")
-    except IOError as e:
+    except OSError as e:
         print(f"❌ Error: Failed to drop entry from configuration mapping file. Error: {e}")
 
 # ── Link Lifecycle Helpers ─────────────────────────────────────────────────────
@@ -138,7 +138,7 @@ def link_file(abs_dest, abs_src):
         print(f"⚠️  Conflict detected at destination: {abs_dest}")
 
         try:
-            diff_res = subprocess.run(["diff", "-q", str(abs_src), str(abs_dest)], capture_output=True)
+            diff_res = subprocess.run(["diff", "-q", str(abs_src), str(abs_dest)], check=False, capture_output=True)
             if diff_res.returncode == 0:
                 print(f"   ➜ Contents are identical. Backing up local asset to: {backup}")
                 if backup.exists() or backup.is_symlink():
@@ -171,7 +171,7 @@ def link_file(abs_dest, abs_src):
                     else:
                         print("   ❌ Warning: Merge session cancelled, exited, or empty. Repo asset untouched.")
                         if os.path.exists(tmp_merge): os.remove(tmp_merge)
-                except Exception as merge_err:
+                except (OSError, subprocess.SubprocessError) as merge_err:
                     print(f"   ❌ Warning: Structural merge execution failed. Error: {merge_err}")
                     if os.path.exists(tmp_merge): os.remove(tmp_merge)
 
@@ -188,7 +188,7 @@ def link_file(abs_dest, abs_src):
                     print("   ❌ Aborting execution loop branch to protect unmerged local state settings.")
                     if orig_backup.exists(): orig_backup.unlink()
                     return False
-        except (IOError, OSError, subprocess.SubprocessError) as fs_err:
+        except (OSError, subprocess.SubprocessError) as fs_err:
             print(f"❌ Error: Environment conflict resolution failure. Trace: {fs_err}")
             return False
 
@@ -200,7 +200,7 @@ def link_file(abs_dest, abs_src):
         abs_dest.symlink_to(abs_src)
         print(f"🔗 Symlink Created:\n   ↳ Target Link: {abs_dest}\n   ↳ Points To  : {abs_src}")
         return True
-    except (IOError, OSError) as link_err:
+    except OSError as link_err:
         print(f"❌ Error: Failed to generate symbolic target linkage. Error: {link_err}")
         return False
 
@@ -227,8 +227,26 @@ def restore_file(abs_dest):
             print(f"   ⏪ Restored: Found orphaned backup file/folder. Swapped back to [{abs_dest}]")
         else:
             print(f"   ℹ️  Skip: Path [{abs_dest}] is not an active symlink and no backup exists.")
-    except (IOError, OSError) as e:
+    except OSError as e:
         print(f"❌ Error: System path restoration fault encountered for reference target {abs_dest}. Error: {e}")
+
+def prompt_structured_hostname():
+    """Interactively build a structured hostname following the convention:
+    domain-form-device-purpose-number (e.g., hm-dst-rpi5-nas-001)
+    """
+    print("\n🏗️  Interactive Hostname Builder")
+    print("Convention format: <domain>-<form>-<device>-<purpose>-<number>")
+
+    domain = input("  ↳ Enter domain (e.g., hm, office): ").strip() or "hm"
+    form = input("  ↳ Enter form factor/location (e.g., dst, lap, srv): ").strip() or "dst"
+    device = input("  ↳ Enter device type (e.g., rpi5, x86, vm): ").strip() or "generic"
+    purpose = input("  ↳ Enter purpose (e.g., nas, dev, workstation): ").strip() or "general"
+    number = input("  ↳ Enter sequence number (e.g., 001): ").strip() or "001"
+
+    constructed = f"{domain}-{form}-{device}-{purpose}-{number}"
+    print(f"✅ Generated Hostname: [{constructed}]\n")
+    return constructed
+
 
 def mkarch_build_iso(host, config, usb=None):
     build_dir = Path.home() / f"archiso-{host}"
@@ -368,14 +386,14 @@ def update_repository_with_remote():
     git_dir = CONFIGS_DIR / ".git"
     try:
         if git_dir.is_dir():
-            print(f"🔄 Repository exists. Enforcing SSH Remote URL structure...")
+            print("🔄 Repository exists. Enforcing SSH Remote URL structure...")
             subprocess.run(["git", "-C", str(CONFIGS_DIR), "remote", "set-url", "origin", CONFIGS_REPO_URL], check=True)
 
             print(f"📥 Pulling latest upstream code modifications...\n   ↳ Target: {CONFIGS_DIR}")
             subprocess.run(["git", "-C", str(CONFIGS_DIR), "pull", "--rebase", "--autostash"], check=True)
         else:
-            print(f"✨ Target directory is untracked. Checking remote repository connection...")
-            clone_res = subprocess.run(["git", "clone", CONFIGS_REPO_URL, str(CONFIGS_DIR)])
+            print("✨ Target directory is untracked. Checking remote repository connection...")
+            clone_res = subprocess.run(["git", "clone", CONFIGS_REPO_URL, str(CONFIGS_DIR)], check=False)
 
             if clone_res.returncode != 0:
                 print("⚠️  Upstream repository cloning failed (does not exist or unauthorized).")
@@ -413,7 +431,7 @@ Commands:
         # Reads the active configs_map.cfg as the configuration engine for the ISO build
         map_file = resolve_mapping_file(cmd, args)
         if not map_file.exists():
-            print(f"\u274c Error: Map profile missing. Run 'configs init-host' first.")
+            print("\u274c Error: Map profile missing. Run 'configs init-host' first.")
             sys.exit(1)
 
         current_host = socket.gethostname()
@@ -426,13 +444,23 @@ Commands:
     if cmd == "init-host":
         update_repository_with_remote()
 
-        current_host = socket.gethostname()
-        host_dir = CONFIGS_DIR / "hosts" / current_host
+        # Determine target host name based on optional arguments or flags
+        target_host = None
+        if len(args) > 1:
+            if args[1] in ("--interactive", "-i"):
+                target_host = prompt_structured_hostname()
+            else:
+                target_host = args[1]
+
+        if not target_host:
+            target_host = socket.gethostname()
+
+        host_dir = CONFIGS_DIR / "hosts" / target_host
         map_file = host_dir / "configs_map.cfg"
         org_file = host_dir / "readme.org"
         example_source = CONFIGS_DIR / "hosts" / "example-host.org"
 
-        print(f"🎬 Bootstrapping infrastructure profile for system host: [{current_host}]")
+        print(f"\U0001f3ac Bootstrapping infrastructure profile for system host: [{target_host}]")
 
         try:
             host_dir.mkdir(parents=True, exist_ok=True)
@@ -441,25 +469,25 @@ Commands:
             if not map_file.exists():
                 with open(map_file, 'w') as f:
                     f.write("[mappings]\n")
-                print(f"   💾 Created structural mapping index file: hosts/{current_host}/configs_map.cfg")
+                print(f"   \U0001f4be Created structural mapping index file: hosts/{target_host}/configs_map.cfg")
             else:
-                print(f"   ⚠️  Skipping index creation: hosts/{current_host}/configs_map.cfg already exists.")
+                print(f"   \u26a0\ufe0f  Skipping index creation: hosts/{target_host}/configs_map.cfg already exists.")
 
             # Copy template file directly from hosts/example-host.org without code block templates
             if not org_file.exists():
                 if example_source.is_file():
                     shutil.copy(example_source, org_file)
-                    print(f"   📝 Cloned playbook from example blueprint: hosts/{current_host}/{current_host}.org")
+                    print(f"   \U0001f4dd Cloned playbook from example blueprint: hosts/{target_host}/readme.org")
                 else:
-                    print(f"   ⚠️  Notice: Custom baseline reference playbook layout not found at {example_source.name}.")
-                    print(f"      Creating empty documentation placeholder at target path.")
+                    print(f"   \u26a0\ufe0f  Notice: Custom baseline reference playbook layout not found at {example_source.name}.")
+                    print("      Creating empty documentation placeholder at target path.")
                     with open(org_file, 'w') as f:
-                        f.write(f"* {current_host.upper()} Configuration Document\n")
+                        f.write(f"* {target_host.upper()} Configuration Document\n")
             else:
-                print(f"   ⚠️  Skipping playbook creation: hosts/{current_host}/{current_host}.org already exists.")
+                print(f"   \u26a0\ufe0f  Skipping playbook creation: hosts/{target_host}/readme.org already exists.")
 
-            print(f"✅ Host configuration files successfully generated for entry environment: hosts/{current_host}/")
-        except IOError as e:
+            print(f"\u2705 Host configuration files successfully generated for entry environment: hosts/{target_host}/")
+        except OSError as e:
             print(f"❌ Error: Failed to write configuration workspace files securely. Error: {e}")
             sys.exit(1)
 
@@ -468,9 +496,9 @@ Commands:
         map_file = resolve_mapping_file(cmd, args)
 
         if not map_file.exists() and cmd in ("link-all", "unlink-all", "list"):
-            print(f"❌ Error: Missing configuration target file context layout profiles.")
+            print("❌ Error: Missing configuration target file context layout profiles.")
             print(f"   ↳ Expected: {map_file}")
-            print(f"💡 Hint: Run 'configs init-host' to initialize this profile first.")
+            print("💡 Hint: Run 'configs init-host' to initialize this profile first.")
             sys.exit(1)
 
         print(f"⚙️  Active Profile Manifest: {map_file}")
@@ -493,7 +521,7 @@ Commands:
                     try:
                         map_remove(abs_dest, map_file)
                         restore_file(abs_dest)
-                    except Exception as e:
+                    except (OSError, subprocess.SubprocessError) as e:
                         print(f"❌ Error: Failed processing teardown on bulk item loop branch: {e}")
 
         elif cmd == "link":
@@ -529,7 +557,7 @@ Commands:
                     else:
                         shutil.copy(abs_dest, abs_src)
                     print(f"   ↳ Copied local configuration configurations to: {abs_src}")
-                except (IOError, OSError) as e:
+                except OSError as e:
                     print(f"❌ Error: Failed to import asset into tracking workspace repository. Trace: {e}")
                     sys.exit(1)
 
@@ -550,7 +578,7 @@ Commands:
                 map_remove(abs_dest, map_file)
                 restore_file(abs_dest)
                 print(f"✅ Success: Fully untracked and restored {abs_dest}")
-            except Exception as e:
+            except (OSError, subprocess.SubprocessError) as e:
                 print(f"❌ Error: Catastrophic failure during teardown sequence. Trace: {e}")
                 sys.exit(1)
 

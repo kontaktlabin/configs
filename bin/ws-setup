@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Workspace Setup Script
+#
+# PURPOSE:
+# Initializes the fundamental directory structure for the developer 
+# workspace to ensure a consistent and organized environment.
+#
+# DIRECTORY SCHEME:
+# - ~/ws/e (External): Professional/Work-related projects and repositories.
+# - ~/ws/i (Internal): Personal projects, private code, and lifelong learning.
+# - ~/ws/i/configs (Configs): Centralized configuration repository.
+# ==============================================================================
+
+echo "🚀 Initializing workspace directories..."
+
+# -p: POSIX-compliant, ensures idempotency (no error if exists).
+# "$HOME": Safely handles spaces in the home directory path.
+mkdir -p "$HOME/ws/e" "$HOME/ws/i"
+
+echo "✅ Workspace setup complete!"
+echo "Directories ready: ~/ws/{e,i}"
+
