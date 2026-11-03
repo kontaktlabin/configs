@@ -1,0 +1,168 @@
+agent:
+  max_turns: 150
+  reasoning_effort: ultra
+_config_version: 51
+
+# ── Security ──────────────────────────────────────────────────────────
+# Secret redaction is ON by default — strings that look like API keys,
+# tokens, and passwords are masked in tool output, logs, and chat
+# responses before the model or user ever sees them. Set redact_secrets
+# to false to disable (e.g. when developing the redactor itself).
+#
+# security:
+#   redact_secrets: true
+
+# ── Fallback Model ────────────────────────────────────────────────────
+# Automatic provider failover when primary is unavailable.
+# Uncomment and configure to enable. Triggers on rate limits (429),
+# overload (529), service errors (503), or connection failures.
+#
+# Supported providers:
+#   openrouter   (OPENROUTER_API_KEY)  — routes to any model
+#   openai-codex (OAuth — hermes auth) — OpenAI Codex
+#   nous         (OAuth — hermes auth) — Nous Portal
+#   zai          (ZAI_API_KEY)         — Z.AI / GLM
+#   kimi-coding  (KIMI_API_KEY)        — Kimi / Moonshot
+#   kimi-coding-cn (KIMI_CN_API_KEY)   — Kimi / Moonshot (China)
+#   minimax      (MINIMAX_API_KEY)     — MiniMax
+#   minimax-cn   (MINIMAX_CN_API_KEY)  — MiniMax (China)
+#   bedrock      (AWS IAM / boto3)     — AWS Bedrock (Converse API)
+#
+# For custom OpenAI-compatible endpoints, add base_url and key_env.
+#
+# fallback_model:
+#   provider: openrouter
+#   model: anthropic/claude-sonnet-4
+browser:
+  cloud_provider: local
+computer_use:
+  backend: cua
+platform_toolsets:
+  cli:
+    - a2a
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - connections
+    - context_engine
+    - cronjob
+    - delegation
+    - file
+    - image_gen
+    - kanban
+    - memory
+    - session_search
+    - skills
+    - terminal
+    - todo
+    - tts
+    - video
+    - video_gen
+    - vision
+    - web
+    - x_search
+    - yuanbao
+known_plugin_toolsets:
+  cli:
+    - a2a
+known_builtin_toolsets:
+  cli:
+    - browser
+    - clarify
+    - code_execution
+    - computer_use
+    - connections
+    - context_engine
+    - cronjob
+    - delegation
+    - discord
+    - discord_admin
+    - file
+    - image_gen
+    - kanban
+    - memory
+    - session_search
+    - skills
+    - stt
+    - terminal
+    - todo
+    - tts
+    - video
+    - video_gen
+    - vision
+    - web
+    - x_search
+    - yuanbao
+telemetry:
+  shared_metrics:
+    enabled: false
+    send: false
+    offer_version: 2
+custom_providers: []
+onboarding:
+  seen:
+    tool_progress_prompt: true
+    busy_input_prompt: true
+    profile_build_offered: true
+approvals:
+  mode: manual
+  timeout: 31536000
+command_allowlist:
+  - ls
+  - cat
+  - find
+  - grep
+local_runtime:
+  enabled: false
+stt:
+  streaming: true
+voice:
+  gpt_live:
+    voice: marin
+  voice_chat_mode: chained
+model:
+  default: gemma4:e2b-it-qat
+  api_mode: chat_completions
+  provider: ollama-office
+  base_url: http://192.168.100.120:11434/v1
+fallback_providers:
+  - provider: llama-cpp
+    model: google/gemma-4-E4B-it-qat-q4_0-gguf:IT
+auxiliary:
+  vision:
+    provider: auto
+    model: ''
+terminal:
+  font_family: FiraCode Nerd Font
+desktop:
+  font_family: Fira Sans
+display:
+  message_reactions: true
+security:
+  allow_private_urls: false
+checkpoints:
+  enabled: true
+providers:
+  llama-cpp:
+    name: llama.cpp
+    base_url: http://127.0.0.1:8080
+    model: google/gemma-4-E4B-it-qat-q4_0-gguf:IT
+    discover_models: true
+    models:
+      google/gemma-4-E4B-it-qat-q4_0-gguf:IT: {}
+  ollama-office:
+    name: ollama office
+    base_url: http://192.168.100.120:11434/v1
+    model: gemma4:e2b-it-qat
+    discover_models: true
+    models:
+      gemma4:e2b-it-qat:
+        context_length: 65536
+      gemma4:26b-a4b-it-mtp-q4_K_M: {}
+      gemma4:e4b-it-qat: {}
+      qwen2.5-coder:3b: {}
+    context_length: 65536
+compression:
+  threshold: 0.8
+  target_ratio: 0
