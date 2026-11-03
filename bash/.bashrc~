@@ -1,0 +1,101 @@
+# =====================================================================
+# ~/.bashrc - Shell Configuration (Arch Linux Only)
+# =====================================================================
+
+# Exit if any command fails, if an unset variable is used, or if a pipeline fails
+#set -euo pipefail
+
+# If not running interactively, don't do anything
+[[ $- != *i* ]] && return
+
+# ---------------------------------------------------------------------
+# 1. PATH CONFIGURATION & TOOLCHAIN SETUP
+# ---------------------------------------------------------------------
+
+# ---------------------------------------------------------------------
+# 3. HISTORY & SHELL BEHAVIOR OPTIONS (SHOPT)
+# ---------------------------------------------------------------------
+export HISTFILE=~/.bash_history
+export HISTSIZE=1000
+export SAVEHIST=500
+export HISTCONTROL=ignoreboth:erasedups
+
+shopt -s autocd
+shopt -s checkwinsize
+shopt -s cdspell
+shopt -s histappend
+shopt -s cmdhist
+shopt -s extglob
+shopt -s no_empty_cmd_completion
+
+# ---------------------------------------------------------------------
+# 4. FILE MANAGEMENT & NAVIGATION ALIASES
+# ---------------------------------------------------------------------
+alias cat='bat'
+alias ls='eza -h --color=always --group-directories-first --icons=always'
+alias ll='ls -l'
+alias la='ls -a'
+alias lla='ls -la'
+alias tree='eza --tree'
+
+alias cp='cp -riv'
+alias mkdir='mkdir -vp'
+alias mv='mv -iv'
+alias rm='rm -riv'
+alias rs='rsync -r --info=progress2'
+
+alias diff='diff --color=auto'
+alias grep='grep --color=auto'
+alias df='df -h'
+alias free='free -m'
+alias topdisk='du -a . | sort -n -r | head -n 10'
+alias ip='ip -color=auto'
+
+# ---------------------------------------------------------------------
+# 5. SYSTEM UTILITIES & PACKAGE MANAGEMENT
+# ---------------------------------------------------------------------
+alias pmrefresh='sudo reflector --age 24 --protocol https --sort rate --save /etc/pacman.d/mirrorlist'
+
+# ---------------------------------------------------------------------
+# 6. FUNCTIONS & BINDINGS
+# ---------------------------------------------------------------------
+function run-help() {
+   local COMMAND
+   COMMAND=$(echo "$READLINE_LINE" | sed 's/^[ \t]*//;s/[ \t]*$//')
+   help "$COMMAND" || man "$COMMAND" || bash -c "${COMMAND} --help"
+}
+bind -x '"\eh": run-help'
+
+# ---------------------------------------------------------------------
+# 7. THIRD-PARTY TOOLS & INTEGRATIONS
+# ---------------------------------------------------------------------
+if command -v fzf >/dev/null 2>&1; then
+    eval "$(fzf --bash)"
+fi
+
+if command -v starship >/dev/null 2>&1; then
+    eval "$(starship init bash)"
+fi
+
+if [ -f /usr/share/doc/pkgfile/command-not-found.bash ]; then
+    source /usr/share/doc/pkgfile/command-not-found.bash
+fi
+
+# ---------------------------------------------------------------------
+# SESSION ENVIRONMENT
+# ---------------------------------------------------------------------
+if [[ -f "$HOME/.config/environment.d/session.conf" ]]; then
+    set -a
+    source "$HOME/.config/environment.d/session.conf"
+    set +a
+fi
+
+# direnv
+eval "$(direnv hook bash)"
+
+case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
+
+source /usr/share/nvm/init-nvm.sh
+
+# Pi
+export PATH="$HOME/.local/bin:$PATH"

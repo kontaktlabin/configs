@@ -8,32 +8,6 @@
 # 1. PATH CONFIGURATION & TOOLCHAIN SETUP
 # ---------------------------------------------------------------------
 
-export PATH="$HOME/.local/bin:$PATH"
-
-
-# ---------------------------------------------------------------------
-# 2. EDITOR, PAGER & FORMATTING ENVIRONMENT
-# ---------------------------------------------------------------------
-export EDITOR='emacsclient -t'
-export VISUAL='emacsclient -c -a ""'
-export PAGER='less'
-export MANPAGER='less -R'
-export MANROFFOPT='-P -c'
-
-export WORDCHARS="${WORDCHARS//[&.;]/}"
-export SUDO_PROMPT=$'\e[38;2;207;34;46mPassword:\e[0m '
-
-# Less UI Colors & Configurations
-export LESS_MINT=$'\e[38;5;43m'
-export LESS_BLUE=$'\e[38;5;33m'
-export LESS_RESET=$'\e[0m'
-export LESS='-S -R -F --incsearch --mouse --use-color -Dd33.16 -Du33.16 -Ds43.16 -DP43.16 -DR33.16 -DE43.16 -DS43.16'
-export LESS_TERMCAP_md="${LESS_MINT}"
-export LESS_TERMCAP_me="${LESS_RESET}"
-export LESS_TERMCAP_us="${LESS_BLUE}"
-export LESS_TERMCAP_ue="${LESS_RESET}"
-export LESS_TERMCAP_so=$'\e[48;5;43;30m'
-export LESS_TERMCAP_se="${LESS_RESET}"
 
 # ---------------------------------------------------------------------
 # 3. HISTORY & SHELL BEHAVIOR OPTIONS
@@ -80,7 +54,6 @@ alias ip='ip -color=auto'
 # ---------------------------------------------------------------------
 # 5. SYSTEM UTILITIES & PACKAGE MANAGEMENT
 # ---------------------------------------------------------------------
-export DIFFPROG='emacs -nw'
 alias pmrefresh='sudo reflector --age 24 --protocol https --sort rate --save /etc/pacman.d/mirrorlist'
 
 # ---------------------------------------------------------------------
@@ -94,12 +67,12 @@ if command -v starship >/dev/null 2>&1; then
     eval "$(starship init zsh)"
 fi
 
-if [[ -z "${SSH_CONNECTION}" ]]; then
-    if [[ "$(uname)" == "Darwin" ]]; then
-        # macOS: Fetch the native launchd socket if missing
-        export SSH_AUTH_SOCK="${SSH_AUTH_SOCK:-$(launchctl getenv SSH_AUTH_SOCK)}"
-    elif [[ "$(uname)" == "Linux" ]]; then
-        # Linux: Use your standard systemd user socket
-        export SSH_AUTH_SOCK="$XDG_RUNTIME_DIR/ssh-agent.socket"
-    fi
+# ---------------------------------------------------------------------
+# SESSION ENVIRONMENT
+# ---------------------------------------------------------------------
+if [[ -f "$HOME/.config/environment.d/session.conf" ]]; then
+    set -a
+    source "$HOME/.config/environment.d/session.conf"
+    set +a
 fi
+

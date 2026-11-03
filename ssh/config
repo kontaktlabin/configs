@@ -3,7 +3,7 @@ IgnoreUnknown UseKeychain
 AddKeysToAgent ask
 
 # Include your work configurations (must be outside/before Match blocks)
-Include ~/.ssh/conf.d/work.config
+Include ~/.ssh/conf.d/e/beta/*
 
 # macOS-specific configuration
 Match exec "uname | grep -q Darwin"
