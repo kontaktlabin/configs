@@ -1,7 +1,7 @@
 agent:
   max_turns: 150
   reasoning_effort: ultra
-_config_version: 51
+_config_version: 52
 
 # ── Security ──────────────────────────────────────────────────────────
 # Secret redaction is ON by default — strings that look like API keys,
@@ -122,13 +122,13 @@ voice:
     voice: marin
   voice_chat_mode: chained
 model:
-  default: gemma4:e2b-it-qat
+  default: gemma4:26b-a4b-it-mtp-q4_K_M
   api_mode: chat_completions
   provider: ollama-office
   base_url: http://192.168.100.120:11434/v1
 fallback_providers:
   - provider: llama-cpp
-    model: google/gemma-4-E4B-it-qat-q4_0-gguf:IT
+    model: unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_K_XL
 auxiliary:
   vision:
     provider: auto
@@ -147,19 +147,21 @@ providers:
   llama-cpp:
     name: llama.cpp
     base_url: http://127.0.0.1:8080
-    model: google/gemma-4-E4B-it-qat-q4_0-gguf:IT
+    model: unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_K_XL
     discover_models: true
     models:
       google/gemma-4-E4B-it-qat-q4_0-gguf:IT: {}
+      unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_K_XL: {}
   ollama-office:
     name: ollama office
     base_url: http://192.168.100.120:11434/v1
-    model: gemma4:e2b-it-qat
+    model: gemma4:26b-a4b-it-mtp-q4_K_M
     discover_models: true
     models:
       gemma4:e2b-it-qat:
         context_length: 65536
-      gemma4:26b-a4b-it-mtp-q4_K_M: {}
+      gemma4:26b-a4b-it-mtp-q4_K_M:
+        context_length: 65536
       gemma4:e4b-it-qat: {}
       qwen2.5-coder:3b: {}
     context_length: 65536
