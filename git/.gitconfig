@@ -1,5 +1,5 @@
 [core]
-	editor = emacs
+	editor = emacsclient -c
 	hooksPath = /home/labin/ws/i/configs/git/githooks/
 
 [user]

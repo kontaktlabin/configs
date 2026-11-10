@@ -122,10 +122,10 @@ voice:
     voice: marin
   voice_chat_mode: chained
 model:
-  default: gemma4:26b-a4b-it-mtp-q4_K_M
+  default: unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_k_XL
   api_mode: chat_completions
-  provider: ollama-office
-  base_url: http://192.168.100.120:11434/v1
+  provider: llama-legion
+  base_url: http://192.168.10.241:9931
 fallback_providers:
   - provider: llama-cpp
     model: unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_K_XL
@@ -165,6 +165,13 @@ providers:
       gemma4:e4b-it-qat: {}
       qwen2.5-coder:3b: {}
     context_length: 65536
+  llama-legion:
+    name: llamma-legion
+    base_url: http://192.168.10.241:9931
+    model: unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_k_XL
+    discover_models: true
+    models:
+      unsloth/gemma-4-E4B-it-qat-GGUF:UD-Q4_k_XL: {}
 compression:
   threshold: 0.8
   target_ratio: 0
